@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>지도 마킹 - 입력</title>
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+  <header><h1>지도 만들기 <small style="font-size:12px;color:#6b7280;"></small></h1></header>
+
+  <div class="container">
+    <div class="toolbar">
+      <button id="test1">테스트 1 (5행)</button>
+      <button id="test2">테스트 2 (20행)</button>
+      <button id="test3">테스트 3 (랜덤 50행)</button>
+      <button id="clearAll">전체 지우기</button>
+    </div>
+    <div class="hint">셀을 클릭하고 엑셀에서 복사한 범위를 <b>Ctrl/⌘+V</b>로 붙여넣으면 탭/개행 기준으로 자동 분배됩니다. (총 500행, 화면에는 15행만 표시)</div>
+
+    <div class="grid-wrap">
+      <div class="grid-view">
+        <table id="grid" class="grid" aria-label="입력 그리드">
+          <colgroup>
+            <col class="no"><col class="name"><col class="tel"><col class="addr"><col class="memo">
+          </colgroup>
+          <thead>
+            <tr><th>NO</th><th>이름</th><th>연락처</th><th>주소</th><th>메모</th></tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="footer">
+      <input id="mapName" type="text" placeholder="지도 이름을 입력하세요 (예: 테스트)" />
+      <button id="btnDone" class="btn" type="button">완료</button>
+    </div>
+  </div>
+
+  <script src="assets/js/app_nomodule.js"></script>
+
+<script src="assets/js/patch_v3.7.8.js"></script>
+</body>
+</html>
