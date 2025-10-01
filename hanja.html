@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>한자 급수 타자게임</title>
+<style>
+  body {
+    margin: 0;
+    background: white; /* 흰 배경 */
+    color: black;
+    font-family: sans-serif;
+    overflow: hidden;
+    text-align: center;
+  }
+  #gameCanvas {
+    display: block;
+    margin: 0 auto;
+    background: white; /* 캔버스 배경도 흰색 */
+  }
+  #status {
+    font-size: 18px;
+    margin: 5px 0;
+  }
+  #inputArea {
+    margin-top: 5px;
+  }
+  #answerBox {
+    font-size: 20px;
+    padding: 5px;
+    width: 200px;
+    text-align: center;
+  }
+  #startBtn {
+    font-size: 20px;
+    padding: 8px 20px;
+    margin: 10px;
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+
+<div id="status">
+  에너지: <span id="energy">10</span> | 
+  점수: <span id="score">0</span> | 
+  최고 점수: <span id="highscore">0</span> | 
+  레벨: <span id="level">1</span>
+</div>
+
+<canvas id="gameCanvas" width="600" height="600"></canvas>
+
+<div id="inputArea">
+  입력: <input type="text" id="answerBox" placeholder="한글 입력" disabled />
+  <button id="startBtn">게임 시작</button>
+</div>
+
+<script>
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+
+let ship = {x: canvas.width/2, y: canvas.height-40, w:50, h:30};
+let bullets = [];
+let enemies = [];
+let energy = 10;
+let score = 0;
+let level = 1;
+
+// ✅ JSON 데이터 직접 포함
+let hanjaList = [
+
+  {"char":"日","sound":"일"},
+  {"char":"月","sound":"월"},
+  {"char":"山","sound":"산"},
+  {"char":"水","sound":"수"},
+  {"char":"火","sound":"화"},
+  {"char":"木","sound":"목"},
+  {"char":"金","sound":"금"},
+  {"char":"土","sound":"토"},
+  {"char":"大","sound":"대"},
+  {"char":"中","sound":"중"},
+  {"char":"小","sound":"소"},
+  {"char":"人","sound":"인"},
+  {"char":"父","sound":"부"},
+  {"char":"母","sound":"모"},
+  {"char":"兄","sound":"형"},
+  {"char":"弟","sound":"제"},
+  {"char":"心","sound":"심"},
+  {"char":"手","sound":"수"},
+  {"char":"足","sound":"족"},
+  {"char":"目","sound":"목"},
+  {"char":"耳","sound":"이"},
+  {"char":"口","sound":"구"},
+  {"char":"言","sound":"언"},
+  {"char":"書","sound":"서"},
+  {"char":"學","sound":"학"},
+  {"char":"校","sound":"교"},
+  {"char":"生","sound":"생"},
+  {"char":"先","sound":"선"},
+  {"char":"知","sound":"지"},
+  {"char":"友","sound":"우"},
+  {"char":"愛","sound":"애"},
+  {"char":"家","sound":"가"},
+  {"char":"國","sound":"국"},
+  {"char":"王","sound":"왕"},
+  {"char":"市","sound":"시"},
+  {"char":"村","sound":"촌"},
+  {"char":"道","sound":"도"},
+  {"char":"寺","sound":"사"},
+  {"char":"佛","sound":"불"},
+  {"char":"神","sound":"신"},
+  {"char":"正","sound":"정"},
+  {"char":"不","sound":"불"},
+  {"char":"多","sound":"다"},
+  {"char":"少","sound":"소"},
+  {"char":"古","sound":"고"},
+  {"char":"今","sound":"금"},
+  {"char":"新","sound":"신"},
+  {"char":"高","sound":"고"},
+  {"char":"低","sound":"저"},
+  {"char":"安","sound":"안"},
+  {"char":"全","sound":"전"},
+  {"char":"半","sound":"반"},
+  {"char":"百","sound":"백"},
+  {"char":"千","sound":"천"},
+  {"char":"萬","sound":"만"},
+  {"char":"億","sound":"억"},
+  {"char":"京","sound":"경"},
+  {"char":"文","sound":"문"},
+  {"char":"字","sound":"자"},
+  {"char":"名","sound":"명"},
+  {"char":"號","sound":"호"},
+  {"char":"音","sound":"음"},
+  {"char":"樂","sound":"악"},
+  {"char":"曲","sound":"곡"},
+  {"char":"歌","sound":"가"},
+  {"char":"舞","sound":"무"},
+  {"char":"美","sound":"미"},
+  {"char":"武","sound":"무"},
+  {"char":"力","sound":"력"},
+  {"char":"男","sound":"남"},
+  {"char":"女","sound":"녀"},
+  {"char":"子","sound":"자"},
+  {"char":"者","sound":"자"},
+  {"char":"老","sound":"노"},
+  {"char":"年","sound":"년"},
+  {"char":"時","sound":"시"},
+  {"char":"分","sound":"분"},
+  {"char":"秒","sound":"초"},
+  {"char":"春","sound":"춘"},
+  {"char":"夏","sound":"하"},
+  {"char":"秋","sound":"추"},
+  {"char":"冬","sound":"동"},
+  {"char":"東","sound":"동"},
+  {"char":"西","sound":"서"},
+  {"char":"南","sound":"남"},
+  {"char":"北","sound":"북"},
+  {"char":"風","sound":"풍"},
+  {"char":"雨","sound":"우"},
+  {"char":"雲","sound":"운"},
+  {"char":"雪","sound":"설"},
+  {"char":"雷","sound":"뢰"},
+  {"char":"電","sound":"전"},
+  {"char":"天","sound":"천"},
+  {"char":"地","sound":"지"},
+  {"char":"空","sound":"공"},
+  {"char":"海","sound":"해"},
+  {"char":"河","sound":"하"},
+  {"char":"湖","sound":"호"},
+  {"char":"洋","sound":"양"},
+  {"char":"島","sound":"도"},
+  {"char":"川","sound":"천"},
+  {"char":"谷","sound":"곡"},
+  {"char":"野","sound":"야"},
+  {"char":"田","sound":"전"},
+    {"char":"畑","sound":"밭"},
+  {"char":"畵","sound":"화"},
+  {"char":"畫","sound":"화"},
+  {"char":"圖","sound":"도"},
+  {"char":"形","sound":"형"},
+  {"char":"色","sound":"색"},
+  {"char":"白","sound":"백"},
+  {"char":"黑","sound":"흑"},
+  {"char":"赤","sound":"적"},
+  {"char":"青","sound":"청"},
+  {"char":"黃","sound":"황"},
+  {"char":"綠","sound":"록"},
+  {"char":"紫","sound":"자"},
+  {"char":"光","sound":"광"},
+  {"char":"明","sound":"명"},
+  {"char":"暗","sound":"암"},
+  {"char":"夜","sound":"야"},
+  {"char":"星","sound":"성"},
+  {"char":"曜","sound":"요"},
+  {"char":"朝","sound":"조"},
+  {"char":"晝","sound":"주"},
+  {"char":"夕","sound":"석"},
+  {"char":"午","sound":"오"},
+  {"char":"晩","sound":"만"},
+  {"char":"午","sound":"오"},
+  {"char":"食","sound":"식"},
+  {"char":"飯","sound":"반"},
+  {"char":"飮","sound":"음"},
+  {"char":"肉","sound":"육"},
+  {"char":"魚","sound":"어"},
+  {"char":"鳥","sound":"조"},
+  {"char":"犬","sound":"견"},
+  {"char":"牛","sound":"우"},
+  {"char":"羊","sound":"양"},
+  {"char":"馬","sound":"마"},
+  {"char":"豕","sound":"시"},
+  {"char":"鹿","sound":"록"},
+  {"char":"米","sound":"미"},
+  {"char":"豆","sound":"두"},
+  {"char":"麥","sound":"맥"},
+  {"char":"菜","sound":"채"},
+  {"char":"果","sound":"과"},
+  {"char":"茶","sound":"차"},
+  {"char":"酒","sound":"주"},
+  {"char":"食","sound":"식"},
+  {"char":"飮","sound":"음"},
+  {"char":"衣","sound":"의"},
+  {"char":"服","sound":"복"},
+  {"char":"帽","sound":"모"},
+  {"char":"鞋","sound":"혜"},
+  {"char":"衣","sound":"의"},
+  {"char":"布","sound":"포"},
+  {"char":"絲","sound":"사"},
+  {"char":"綿","sound":"면"},
+  {"char":"毛","sound":"모"},
+  {"char":"皮","sound":"피"},
+  {"char":"革","sound":"혁"},
+  {"char":"金","sound":"금"},
+  {"char":"銀","sound":"은"},
+  {"char":"銅","sound":"동"},
+  {"char":"鐵","sound":"철"},
+  {"char":"玉","sound":"옥"},
+  {"char":"石","sound":"석"},
+  {"char":"珠","sound":"주"},
+  {"char":"寶","sound":"보"},
+  {"char":"珍","sound":"진"},
+  {"char":"貝","sound":"패"},
+  {"char":"貨","sound":"화"},
+  {"char":"財","sound":"재"},
+  {"char":"買","sound":"매"},
+  {"char":"賣","sound":"매"},
+  {"char":"市","sound":"시"},
+  {"char":"店","sound":"점"},
+  {"char":"商","sound":"상"},
+  {"char":"客","sound":"객"},
+  {"char":"船","sound":"선"},
+  {"char":"車","sound":"차"},
+  {"char":"道","sound":"도"},
+  {"char":"路","sound":"로"},
+  {"char":"橋","sound":"교"},
+  {"char":"港","sound":"항"},
+  {"char":"運","sound":"운"},
+  {"char":"通","sound":"통"},
+  {"char":"交","sound":"교"},
+  {"char":"行","sound":"행"},
+  {"char":"止","sound":"지"},
+  {"char":"近","sound":"근"},
+  {"char":"遠","sound":"원"},
+  {"char":"速","sound":"속"},
+  {"char":"遲","sound":"지"},
+  {"char":"左","sound":"좌"},
+  {"char":"右","sound":"우"},
+  {"char":"南","sound":"남"},
+  {"char":"北","sound":"북"},
+  {"char":"東","sound":"동"},
+  {"char":"西","sound":"서"},
+  {"char":"出","sound":"출"},
+  {"char":"入","sound":"입"},
+  {"char":"門","sound":"문"},
+  {"char":"戶","sound":"호"},
+  {"char":"家","sound":"가"},
+  {"char":"室","sound":"실"},
+  {"char":"庭","sound":"정"},
+  {"char":"堂","sound":"당"},
+  {"char":"窓","sound":"창"},
+    {"char":"屋","sound":"옥"},
+  {"char":"室","sound":"실"},
+  {"char":"床","sound":"상"},
+  {"char":"席","sound":"석"},
+  {"char":"廳","sound":"청"},
+  {"char":"堂","sound":"당"},
+  {"char":"庫","sound":"고"},
+  {"char":"庫","sound":"고"},
+  {"char":"學","sound":"학"},
+  {"char":"校","sound":"교"},
+  {"char":"室","sound":"실"},
+  {"char":"園","sound":"원"},
+  {"char":"場","sound":"장"},
+  {"char":"所","sound":"소"},
+  {"char":"院","sound":"원"},
+  {"char":"病","sound":"병"},
+  {"char":"醫","sound":"의"},
+  {"char":"藥","sound":"약"},
+  {"char":"室","sound":"실"},
+  {"char":"店","sound":"점"},
+  {"char":"館","sound":"관"},
+  {"char":"樓","sound":"루"},
+  {"char":"建","sound":"건"},
+  {"char":"物","sound":"물"},
+  {"char":"室","sound":"실"},
+  {"char":"宅","sound":"택"},
+  {"char":"村","sound":"촌"},
+  {"char":"市","sound":"시"},
+  {"char":"京","sound":"경"},
+  {"char":"都","sound":"도"},
+  {"char":"邑","sound":"읍"},
+  {"char":"郡","sound":"군"},
+  {"char":"道","sound":"도"},
+  {"char":"國","sound":"국"},
+  {"char":"界","sound":"계"},
+  {"char":"世","sound":"세"},
+  {"char":"界","sound":"계"},
+  {"char":"地","sound":"지"},
+  {"char":"球","sound":"구"},
+  {"char":"全","sound":"전"},
+  {"char":"世","sound":"세"},
+  {"char":"洲","sound":"주"},
+  {"char":"洋","sound":"양"},
+  {"char":"半","sound":"반"},
+  {"char":"島","sound":"도"},
+  {"char":"山","sound":"산"},
+  {"char":"脈","sound":"맥"},
+  {"char":"江","sound":"강"},
+  {"char":"河","sound":"하"},
+  {"char":"湖","sound":"호"},
+  {"char":"島","sound":"도"},
+  {"char":"島","sound":"도"},
+  {"char":"京","sound":"경"},
+  {"char":"漢","sound":"한"},
+  {"char":"城","sound":"성"},
+  {"char":"府","sound":"부"},
+  {"char":"縣","sound":"현"},
+  {"char":"面","sound":"면"},
+  {"char":"里","sound":"리"},
+  {"char":"村","sound":"촌"},
+  {"char":"洞","sound":"동"},
+  {"char":"樓","sound":"루"},
+  {"char":"層","sound":"층"},
+  {"char":"高","sound":"고"},
+  {"char":"低","sound":"저"},
+  {"char":"長","sound":"장"},
+  {"char":"短","sound":"단"},
+  {"char":"大","sound":"대"},
+  {"char":"小","sound":"소"},
+  {"char":"多","sound":"다"},
+  {"char":"少","sound":"소"},
+  {"char":"廣","sound":"광"},
+  {"char":"狹","sound":"협"},
+  {"char":"厚","sound":"후"},
+  {"char":"薄","sound":"박"},
+  {"char":"深","sound":"심"},
+  {"char":"淺","sound":"천"},
+  {"char":"快","sound":"쾌"},
+  {"char":"樂","sound":"락"},
+  {"char":"悲","sound":"비"},
+  {"char":"喜","sound":"희"},
+  {"char":"怒","sound":"노"},
+  {"char":"哀","sound":"애"},
+  {"char":"安","sound":"안"},
+  {"char":"危","sound":"위"},
+  {"char":"正","sound":"정"},
+  {"char":"邪","sound":"사"},
+  {"char":"善","sound":"선"},
+  {"char":"惡","sound":"악"},
+  {"char":"美","sound":"미"},
+  {"char":"醜","sound":"추"},
+  {"char":"親","sound":"친"},
+  {"char":"疎","sound":"소"},
+  {"char":"愛","sound":"애"},
+  {"char":"憎","sound":"증"},
+  {"char":"信","sound":"신"},
+  {"char":"疑","sound":"의"},
+  {"char":"勇","sound":"용"},
+  {"char":"怯","sound":"겁"},
+  {"char":"勤","sound":"근"},
+    {"char":"勞","sound":"로"},
+  {"char":"逸","sound":"일"},
+  {"char":"富","sound":"부"},
+  {"char":"貧","sound":"빈"},
+  {"char":"貴","sound":"귀"},
+  {"char":"賤","sound":"천"},
+  {"char":"善","sound":"선"},
+  {"char":"惡","sound":"악"},
+  {"char":"正","sound":"정"},
+  {"char":"邪","sound":"사"},
+  {"char":"是","sound":"시"},
+  {"char":"非","sound":"비"},
+  {"char":"長","sound":"장"},
+  {"char":"幼","sound":"유"},
+  {"char":"男","sound":"남"},
+  {"char":"女","sound":"여"},
+  {"char":"親","sound":"친"},
+  {"char":"疎","sound":"소"},
+  {"char":"和","sound":"화"},
+  {"char":"戰","sound":"전"},
+  {"char":"平","sound":"평"},
+  {"char":"亂","sound":"란"},
+  {"char":"文","sound":"문"},
+  {"char":"武","sound":"무"},
+  {"char":"君","sound":"군"},
+  {"char":"臣","sound":"신"},
+  {"char":"民","sound":"민"},
+  {"char":"上","sound":"상"},
+  {"char":"下","sound":"하"},
+  {"char":"左","sound":"좌"},
+  {"char":"右","sound":"우"},
+  {"char":"前","sound":"전"},
+  {"char":"後","sound":"후"},
+  {"char":"內","sound":"내"},
+  {"char":"外","sound":"외"},
+  {"char":"入","sound":"입"},
+  {"char":"出","sound":"출"},
+  {"char":"始","sound":"시"},
+  {"char":"終","sound":"종"},
+  {"char":"開","sound":"개"},
+  {"char":"閉","sound":"폐"},
+  {"char":"生","sound":"생"},
+  {"char":"死","sound":"사"},
+  {"char":"去","sound":"거"},
+  {"char":"來","sound":"래"},
+  {"char":"有","sound":"유"},
+  {"char":"無","sound":"무"},
+  {"char":"得","sound":"득"},
+  {"char":"失","sound":"실"},
+  {"char":"同","sound":"동"},
+  {"char":"異","sound":"이"},
+  {"char":"合","sound":"합"},
+  {"char":"分","sound":"분"},
+  {"char":"增","sound":"증"},
+  {"char":"減","sound":"감"},
+  {"char":"出","sound":"출"},
+  {"char":"入","sound":"입"},
+  {"char":"升","sound":"승"},
+  {"char":"降","sound":"강"},
+  {"char":"始","sound":"시"},
+  {"char":"終","sound":"종"},
+  {"char":"得","sound":"득"},
+  {"char":"失","sound":"실"},
+  {"char":"古","sound":"고"},
+  {"char":"今","sound":"금"},
+  {"char":"來","sound":"래"},
+  {"char":"去","sound":"거"},
+  {"char":"上","sound":"상"},
+  {"char":"下","sound":"하"},
+  {"char":"長","sound":"장"},
+  {"char":"短","sound":"단"}
+];
+
+let highScore = localStorage.getItem("hanjaHighScore") || 0;
+document.getElementById("highscore").innerText = highScore;
+
+let enemySpeed = 2;
+let spawnInterval = 2000;
+let spawnTimer;
+let gameRunning = false;
+
+// 적 생성
+function spawnEnemy(){
+  if(hanjaList.length===0) return;
+  let data = hanjaList[Math.floor(Math.random()*hanjaList.length)];
+  enemies.push({
+    x: Math.random()*(canvas.width-40)+20,
+    y: -40,
+    char: data.char,
+    sound: data.sound
+  });
+}
+
+// 우주선
+function drawShip(){
+  ctx.fillStyle="blue";
+  ctx.beginPath();
+  ctx.moveTo(ship.x, ship.y-ship.h/2);
+  ctx.lineTo(ship.x-ship.w/2, ship.y+ship.h/2);
+  ctx.lineTo(ship.x+ship.w/2, ship.y+ship.h/2);
+  ctx.closePath();
+  ctx.fill();
+}
+
+// 총알
+function drawBullets(){
+  ctx.fillStyle="red";
+  bullets.forEach((b,i)=>{
+    ctx.fillRect(b.x-2,b.y-10,4,10);
+    b.y-=10;
+    if(b.y<0) bullets.splice(i,1);
+  });
+}
+
+// 적
+function drawEnemies(){
+  ctx.fillStyle="black"; // 검정색 한자
+  ctx.font="32px Arial";
+  enemies.forEach((e,i)=>{
+    ctx.fillText(e.char,e.x,e.y);
+    e.y+=enemySpeed;
+    if(e.y>canvas.height){
+      enemies.splice(i,1);
+      energy--;
+      updateStatus();
+    }
+  });
+}
+
+// 충돌 체크
+function detectCollision(){
+  bullets.forEach((b,bi)=>{
+    enemies.forEach((e,ei)=>{
+      if(b.x>e.x-20 && b.x<e.x+20 && b.y>e.y-40 && b.y<e.y+10){
+        bullets.splice(bi,1);
+        enemies.splice(ei,1);
+        score += 10;
+        checkLevelUp();
+        updateStatus();
+      }
+    });
+  });
+}
+
+// 상태 업데이트
+function updateStatus(){
+  document.getElementById("energy").innerText=energy;
+  document.getElementById("score").innerText=score;
+  document.getElementById("level").innerText=level;
+
+  if(score > highScore){
+    highScore = score;
+    localStorage.setItem("hanjaHighScore", highScore);
+    document.getElementById("highscore").innerText = highScore;
+  }
+
+  if(energy<=0){
+    alert("게임 오버!\n최종 점수: " + score + 
+          "\n최고 점수: " + highScore + 
+          "\n최종 레벨: " + level);
+    document.location.reload();
+  }
+}
+
+// 레벨업
+function checkLevelUp(){
+  let newLevel = Math.floor(score/100)+1;
+  if(newLevel > level){
+    level = newLevel;
+    enemySpeed += 0.5;
+    spawnInterval = Math.max(500, spawnInterval - 200);
+    restartSpawn();
+  }
+}
+
+// 스폰 재시작
+function restartSpawn(){
+  clearInterval(spawnTimer);
+  spawnTimer = setInterval(spawnEnemy, spawnInterval);
+}
+
+// 게임 루프
+function gameLoop(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  if(gameRunning){
+    drawShip();
+    drawBullets();
+    drawEnemies();
+    detectCollision();
+  }
+}
+setInterval(gameLoop,30);
+
+// 입력 박스 이벤트
+const answerBox = document.getElementById("answerBox");
+answerBox.addEventListener("keydown", e=>{
+  if(e.key==="Enter" && gameRunning){
+    const inputText = answerBox.value.trim();
+    enemies.forEach((enemy,i)=>{
+      if(enemy.sound===inputText){
+        bullets.push({x:ship.x,y:ship.y-ship.h});
+        enemies.splice(i,1);
+        score += 20;
+        checkLevelUp();
+        updateStatus();
+      }
+    });
+    answerBox.value="";
+  }
+});
+
+// 시작 버튼
+document.getElementById("startBtn").addEventListener("click", ()=>{
+  if(!gameRunning){
+    gameRunning = true;
+    energy = 10;
+    score = 0;
+    level = 1;
+    enemies = [];
+    bullets = [];
+    enemySpeed = 2;
+    spawnInterval = 2000;
+    updateStatus();
+    restartSpawn();
+    answerBox.disabled = false;
+    answerBox.focus();
+  }
+});
+</script>
+</body>
+</html>
