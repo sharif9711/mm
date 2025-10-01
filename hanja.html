@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-<meta charset="utf-8" />
-<title>한자 급수 타자게임 — 폭파 모드</title>
+<meta charset="UTF-8">
+<title>한자 급수 타자게임</title>
 <style>
   body {
     margin: 0;
@@ -22,19 +22,10 @@
     font-size: 18px;
     margin: 6px 0;
   }
-  #inputArea {
-    margin-top: 6px;
-  }
-  #answerBox {
-    font-size: 18px;
-    padding: 6px;
-    width: 220px;
-    text-align: center;
-  }
   #startBtn {
     font-size: 16px;
     padding: 6px 14px;
-    margin-left: 8px;
+    margin: 6px;
     cursor: pointer;
   }
 </style>
@@ -45,43 +36,29 @@
   에너지: <span id="energy">10</span> |
   점수: <span id="score">0</span> |
   최고 점수: <span id="highscore">0</span> |
-  레벨: <span id="level">1</span>
+  레벨: <span id="level">1</span> |
+  무기해제: <span id="unlocked">1</span>
 </div>
 
 <canvas id="gameCanvas" width="600" height="600"></canvas>
 
-<div id="inputArea">
-  입력: <input type="text" id="answerBox" placeholder="한글 입력" disabled />
-  <button id="startBtn">게임 시작</button>
-</div>
+<button id="startBtn">게임 시작</button>
 
 <script>
-/* =========================
-   기본 설정 / 상태 변수
-   ========================= */
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 
-let ship = { x: canvas.width/2, y: canvas.height - 40, w: 50, h: 30 };
+let ship = { x: canvas.width/2, y: canvas.height-40, w:50, h:30 };
+let bullets = [];
 let enemies = [];
-let explosions = []; // 폭발 파티클들
 let energy = 10;
 let score = 0;
 let level = 1;
-let hanjaList = []; // 한자 데이터 (아래에 직접 포함되어 있음)
+let unlockedWeapons = 1; // ✅ 무기 해제 단계 (1번 기본)
 
-let highScore = localStorage.getItem("hanjaHighScore") || 0;
-document.getElementById("highscore").innerText = highScore;
-
-let enemySpeed = 2;
-let spawnInterval = 2000;
-let spawnTimer;
-let gameRunning = false;
-
-/* =========================
-   한자 데이터 (샘플 — 전체 371자 붙여넣기 가능)
-   ========================= */
-hanjaList = [  {"char":"日","sound":"일"},
+// 한자 샘플
+let hanjaList = [
+  {"char":"日","sound":"일"},
   {"char":"月","sound":"월"},
   {"char":"山","sound":"산"},
   {"char":"水","sound":"수"},
@@ -461,130 +438,120 @@ hanjaList = [  {"char":"日","sound":"일"},
   {"char":"下","sound":"하"},
   {"char":"長","sound":"장"},
   {"char":"短","sound":"단"}
+
+
+
+
 ];
 
-/* =========================
-   적 생성 / 제거
-   ========================= */
+let highScore = localStorage.getItem("hanjaHighScore") || 0;
+document.getElementById("highscore").innerText = highScore;
+
+let enemySpeed = 0.7;
+let spawnInterval = 3500;
+let spawnTimer;
+let gameRunning = false;
+
+/* ===== 적 생성 ===== */
 function spawnEnemy(){
   if(!gameRunning) return;
-  if(hanjaList.length === 0) return;
-  const data = hanjaList[Math.floor(Math.random() * hanjaList.length)];
-  enemies.push({
-    x: Math.random() * (canvas.width - 80) + 40,
-    y: -30 - Math.random()*40,
-    char: data.char,
-    sound: data.sound
-  });
+  let data = hanjaList[Math.floor(Math.random()*hanjaList.length)];
+  enemies.push({ x: Math.random()*(canvas.width-40)+20, y: -30, char: data.char });
 }
 
-/* =========================
-   폭발 이펙트 (간단한 파티클 시스템)
-   ========================= */
-function createExplosion(x, y, colorBase="#ff8c00", particleCount=24){
-  const p = { particles: [], life: 60 };
-  for(let i=0;i<particleCount;i++){
-    const angle = Math.random()*Math.PI*2;
-    const speed = 1 + Math.random()*4;
-    const vx = Math.cos(angle)*speed;
-    const vy = Math.sin(angle)*speed;
-    const size = 2 + Math.random()*4;
-    // 색상을 붉은-주황 계열로 약간 랜덤
-    const r = 200 + Math.floor(Math.random()*55);
-    const g = 80 + Math.floor(Math.random()*100);
-    const b = Math.floor(Math.random()*60);
-    const color = `rgba(${r},${g},${b},1)`;
-    p.particles.push({ x, y, vx, vy, size, life: 40 + Math.floor(Math.random()*25), color });
-  }
-  // 가벼운 플래시 효과
-  p.flash = { x, y, a: 0.9, life: 12 };
-  explosions.push(p);
-}
-
-/* =========================
-   그리기: 우주선 / 적 / 폭발
-   ========================= */
+/* ===== 그리기 ===== */
 function drawShip(){
-  ctx.fillStyle = "#0055ff";
+  ctx.fillStyle="blue";
   ctx.beginPath();
-  ctx.moveTo(ship.x, ship.y - ship.h/2);
-  ctx.lineTo(ship.x - ship.w/2, ship.y + ship.h/2);
-  ctx.lineTo(ship.x + ship.w/2, ship.y + ship.h/2);
+  ctx.moveTo(ship.x, ship.y-ship.h/2);
+  ctx.lineTo(ship.x-ship.w/2, ship.y+ship.h/2);
+  ctx.lineTo(ship.x+ship.w/2, ship.y+ship.h/2);
   ctx.closePath();
   ctx.fill();
 }
 
+function drawBullets(){
+  bullets.forEach((b,i)=>{
+    if(b.type==="power"){           // 파워샷
+      ctx.fillStyle="darkred";
+      ctx.fillRect(b.x-4,b.y-20,8,20);
+      b.y-=8;
+    } 
+    else if(b.type==="spread"){     // 확산샷
+      ctx.fillStyle="orange";
+      ctx.fillRect(b.x-2,b.y-8,4,8);
+      b.y-=6;
+      if(b.vx) b.x+=b.vx;
+    }
+    else if(b.type==="missile"){    // 유도 미사일
+      ctx.fillStyle="green";
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, 6, 0, Math.PI*2);
+      ctx.fill();
+
+      // 가장 아래쪽 적 추적
+      if(!b.target || !enemies.includes(b.target)){
+        if(enemies.length>0){
+          let bottomEnemy = enemies.reduce((a,c)=> (a.y>c.y? a:c));
+          b.target = bottomEnemy;
+        }
+      }
+      if(b.target){
+        let dx = b.target.x - b.x;
+        let dy = b.target.y - b.y;
+        let dist = Math.sqrt(dx*dx + dy*dy);
+        if(dist > 0){
+          b.x += (dx/dist)*4;
+          b.y += (dy/dist)*4;
+        }
+      } else {
+        b.y -= 4;
+      }
+    }
+    else {                          // 일반 레이저
+      ctx.fillStyle="red";
+      ctx.fillRect(b.x-2,b.y-10,4,10);
+      b.y-=6;
+    }
+    if(b.y<0 || b.y>canvas.height) bullets.splice(i,1);
+  });
+}
+
 function drawEnemies(){
-  ctx.fillStyle = "black";      // 한자 검정색
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.font = "36px serif";      // 서체는 serif가 한자 가독성 좋음
-  for(let i = enemies.length - 1; i >= 0; i--){
-    const e = enemies[i];
-    ctx.fillText(e.char, e.x, e.y);
-    e.y += enemySpeed;
-    // 바닥 닿으면 에너지 감소
-    if(e.y > canvas.height - 10){
-      enemies.splice(i, 1);
+  ctx.fillStyle="black";
+  ctx.font="32px Arial";
+  enemies.forEach((e,i)=>{
+    ctx.fillText(e.char,e.x,e.y);
+    e.y+=enemySpeed;
+    if(e.y>canvas.height){
+      enemies.splice(i,1);
       energy--;
       updateStatus();
     }
-  }
+  });
 }
 
-function drawExplosions(){
-  for(let i = explosions.length - 1; i >= 0; i--){
-    const ex = explosions[i];
-    // flash
-    if(ex.flash && ex.flash.life > 0){
-      ctx.save();
-      ctx.globalAlpha = ex.flash.a * (ex.flash.life / 12);
-      ctx.fillStyle = "rgba(255,230,150,1)";
-      ctx.beginPath();
-      ctx.arc(ex.flash.x, ex.flash.y, 40, 0, Math.PI*2);
-      ctx.fill();
-      ctx.restore();
-      ex.flash.life--;
-    }
-    // particles
-    for(let j = ex.particles.length - 1; j >= 0; j--){
-      const p = ex.particles[j];
-      // draw
-      ctx.save();
-      const alpha = Math.max(0, p.life/80);
-      ctx.globalAlpha = alpha;
-      ctx.fillStyle = p.color;
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, p.size, 0, Math.PI*2);
-      ctx.fill();
-      ctx.restore();
-      // update
-      p.x += p.vx;
-      p.y += p.vy;
-      // gravity-like
-      p.vy += 0.08;
-      p.vx *= 0.99;
-      p.vy *= 0.99;
-      p.life -= 1;
-      if(p.life <= 0){
-        ex.particles.splice(j, 1);
+function detectCollision(){
+  bullets.forEach((b,bi)=>{
+    enemies.forEach((e,ei)=>{
+      if(b.x>e.x-20 && b.x<e.x+20 && b.y>e.y-30 && b.y<e.y+10){
+        bullets.splice(bi,1);
+        enemies.splice(ei,1);
+        score += 20;
+        checkUnlock();
+        checkLevelUp();
+        updateStatus();
       }
-    }
-    // reduce explosion life and remove if no particles
-    ex.life--;
-    if(ex.particles.length === 0 || ex.life <= 0){
-      explosions.splice(i, 1);
-    }
-  }
+    });
+  });
 }
 
-/* =========================
-   상태 업데이트 / 레벨업
-   ========================= */
+/* ===== 상태 / 레벨업 ===== */
 function updateStatus(){
-  document.getElementById("energy").innerText = energy;
-  document.getElementById("score").innerText = score;
-  document.getElementById("level").innerText = level;
+  document.getElementById("energy").innerText=energy;
+  document.getElementById("score").innerText=score;
+  document.getElementById("level").innerText=level;
+  document.getElementById("unlocked").innerText=unlockedWeapons;
 
   if(score > highScore){
     highScore = score;
@@ -592,166 +559,87 @@ function updateStatus(){
     document.getElementById("highscore").innerText = highScore;
   }
 
-  if(energy <= 0){
-    // 폭발 잔상 보여주고 재시작
-    setTimeout(()=>{
-      alert("게임 오버!\n최종 점수: " + score + "\n최고 점수: " + highScore + "\n최종 레벨: " + level);
-      location.reload();
-    }, 100);
+  if(energy<=0){
+    alert("게임 오버!\n최종 점수: " + score +
+          "\n최고 점수: " + highScore +
+          "\n최종 레벨: " + level +
+          "\n해제된 무기: " + unlockedWeapons);
+    location.reload();
   }
 }
 
 function checkLevelUp(){
-  const newLevel = Math.floor(score/100) + 1;
+  let newLevel = Math.floor(score/200)+1;
   if(newLevel > level){
     level = newLevel;
-    enemySpeed += 0.6;
-    spawnInterval = Math.max(500, spawnInterval - 200);
+    enemySpeed += 0.2;
+    spawnInterval = Math.max(2000, spawnInterval - 300);
     restartSpawn();
-    // 레벨업 텍스트 잠깐 표시
-    showLevelText("LEVEL " + level);
   }
 }
 
-/* =========================
-   간단한 레벨 텍스트 애니 (화면 중앙에 잠깐)
-   ========================= */
-let levelText = { text: "", timer: 0 };
-function showLevelText(txt){
-  levelText.text = txt;
-  levelText.timer = 60;
+/* ===== 무기 해제 체크 ===== */
+function checkUnlock(){
+  let unlockStage = Math.floor(score/100)+1;
+  if(unlockStage > unlockedWeapons){
+    unlockedWeapons = unlockStage;
+    updateStatus();
+    alert("새로운 무기가 해제되었습니다! ("+unlockedWeapons+"번 무기 사용 가능)");
+  }
 }
 
-/* =========================
-   스폰 재시작 / 게임 루프
-   ========================= */
+/* ===== 게임 루프 ===== */
 function restartSpawn(){
   clearInterval(spawnTimer);
   spawnTimer = setInterval(spawnEnemy, spawnInterval);
 }
 
 function gameLoop(){
-  // 배경
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  // draw elements
+  ctx.clearRect(0,0,canvas.width,canvas.height);
   if(gameRunning){
     drawShip();
+    drawBullets();
     drawEnemies();
-    drawExplosions();
-    // level text
-    if(levelText.timer > 0){
-      ctx.save();
-      ctx.globalAlpha = levelText.timer / 60;
-      ctx.fillStyle = "rgba(0,0,0,0.7)";
-      ctx.font = "bold 36px Arial";
-      ctx.textAlign = "center";
-      ctx.fillText(levelText.text, canvas.width/2, canvas.height/2);
-      ctx.restore();
-      levelText.timer--;
-    }
-  } else {
-    // 안내 텍스트 (게임 미시작 상태)
-    ctx.save();
-    ctx.fillStyle = "#333";
-    ctx.font = "20px Arial";
-    ctx.textAlign = "center";
-    ctx.fillText("게임 시작 버튼을 누르면 한자가 떨어집니다.", canvas.width/2, canvas.height/2 - 20);
-    ctx.fillText("아래 입력창에 한글로 입력 후 Enter", canvas.width/2, canvas.height/2 + 10);
-    ctx.restore();
+    detectCollision();
   }
 }
-setInterval(gameLoop, 30);
+setInterval(gameLoop,30);
 
-/* =========================
-   입력(아래 input) 처리 — 정답 맞추면 폭발
-   ========================= */
-const answerBox = document.getElementById("answerBox");
-answerBox.addEventListener("keydown", (e) => {
-  if(e.key === "Enter" && gameRunning){
-    const inputText = answerBox.value.trim();
-    if(!inputText) return;
-    // 가장 윗 적 (혹은 첫번째 적)부터 찾도록 한다 — 가까운 적 우선 등 변경 가능
-    let matchedIndex = -1;
-    for(let i = 0; i < enemies.length; i++){
-      if(enemies[i].sound === inputText){
-        matchedIndex = i;
-        break;
-      }
-    }
-    if(matchedIndex >= 0){
-      const e = enemies[matchedIndex];
-      // 폭발 생성 (e.x, e.y)
-      createExplosion(e.x, e.y, "#ff8c00", 28);
-      // 한자 제거
-      enemies.splice(matchedIndex, 1);
-      // 점수
-      score += 20;
-      checkLevelUp();
-      updateStatus();
-    } else {
-      // 틀렸을 때 피드백 원하면 여기에 효과 추가 가능
-      // (예: 화면에 빨간 테두리 깜빡임)
-      flashCanvasRed();
-    }
-    answerBox.value = "";
+/* ===== 조작 ===== */
+window.addEventListener("keydown", e=>{
+  if(!gameRunning) return;
+  if(e.key==="ArrowLeft"){
+    ship.x=Math.max(30, ship.x-20);
+  } else if(e.key==="ArrowRight"){
+    ship.x=Math.min(canvas.width-30, ship.x+20);
+  } 
+  else if((e.key==="1" || e.code==="Numpad1") && unlockedWeapons>=1){
+    bullets.push({x:ship.x,y:ship.y-ship.h,type:"normal"});
+  }
+  else if((e.key==="2" || e.code==="Numpad2") && unlockedWeapons>=2){
+    bullets.push({x:ship.x,y:ship.y-ship.h,type:"power"});
+  }
+  else if((e.key==="3" || e.code==="Numpad3") && unlockedWeapons>=3){
+    bullets.push({x:ship.x-10,y:ship.y-ship.h,vx:-2,type:"spread"});
+    bullets.push({x:ship.x,   y:ship.y-ship.h,vx:0, type:"spread"});
+    bullets.push({x:ship.x+10,y:ship.y-ship.h,vx:2, type:"spread"});
+  }
+  else if((e.key==="4" || e.code==="Numpad4") && unlockedWeapons>=4){
+    bullets.push({x:ship.x,y:ship.y-ship.h,type:"missile",target:null});
   }
 });
 
-// 틀렸을 때 캔버스 깜빡임(약한 피드백)
-let flashRed = 0;
-function flashCanvasRed(){
-  flashRed = 8;
-  const orig = ctx.fillStyle;
-  const id = setInterval(()=>{
-    if(flashRed <= 0){
-      clearInterval(id);
-      return;
-    }
-    ctx.save();
-    ctx.globalAlpha = 0.12;
-    ctx.fillStyle = "red";
-    ctx.fillRect(0,0,canvas.width, canvas.height);
-    ctx.restore();
-    flashRed--;
-  }, 30);
-}
-
-/* =========================
-   시작 버튼 동작
-   ========================= */
-document.getElementById("startBtn").addEventListener("click", () => {
+/* ===== 시작 버튼 ===== */
+document.getElementById("startBtn").addEventListener("click", ()=>{
   if(!gameRunning){
-    gameRunning = true;
-    energy = 10;
-    score = 0;
-    level = 1;
-    enemies = [];
-    explosions = [];
-    enemySpeed = 2;
-    spawnInterval = 2000;
+    gameRunning=true;
+    energy=10; score=0; level=1; unlockedWeapons=1;
+    enemies=[]; bullets=[];
+    enemySpeed=0.7; spawnInterval=3500;
     updateStatus();
     restartSpawn();
-    answerBox.disabled = false;
-    answerBox.focus();
   }
 });
-
-/* =========================
-   유틸: 키보드로 우주선 좌우 이동 (선택사항)
-   ========================= */
-window.addEventListener("keydown", (e) => {
-  if(!gameRunning) return;
-  if(e.key === "ArrowLeft"){
-    ship.x = Math.max(30, ship.x - 20);
-  } else if(e.key === "ArrowRight"){
-    ship.x = Math.min(canvas.width - 30, ship.x + 20);
-  }
-});
-
-/* =========================
-   초기 상태 표시
-   ========================= */
-updateStatus();
 </script>
 </body>
 </html>
