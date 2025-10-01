@@ -22,6 +22,13 @@
     font-size: 18px;
     margin: 6px 0;
   }
+  #answerBox {
+    font-size: 18px;
+    padding: 6px;
+    width: 200px;
+    margin: 6px;
+    text-align: center;
+  }
   #startBtn {
     font-size: 16px;
     padding: 6px 14px;
@@ -42,6 +49,7 @@
 
 <canvas id="gameCanvas" width="600" height="600"></canvas>
 
+<input id="answerBox" placeholder="한글 입력" />
 <button id="startBtn">게임 시작</button>
 
 <script>
@@ -54,7 +62,7 @@ let enemies = [];
 let energy = 10;
 let score = 0;
 let level = 1;
-let unlockedWeapons = 1; // ✅ 무기 해제 단계 (1번 기본)
+let unlockedWeapons = 1; // ✅ 처음부터 무기 1 해제
 
 // 한자 샘플
 let hanjaList = [
@@ -438,10 +446,6 @@ let hanjaList = [
   {"char":"下","sound":"하"},
   {"char":"長","sound":"장"},
   {"char":"短","sound":"단"}
-
-
-
-
 ];
 
 let highScore = localStorage.getItem("hanjaHighScore") || 0;
@@ -456,7 +460,7 @@ let gameRunning = false;
 function spawnEnemy(){
   if(!gameRunning) return;
   let data = hanjaList[Math.floor(Math.random()*hanjaList.length)];
-  enemies.push({ x: Math.random()*(canvas.width-40)+20, y: -30, char: data.char });
+  enemies.push({ x: Math.random()*(canvas.width-40)+20, y: -30, char: data.char, sound: data.sound });
 }
 
 /* ===== 그리기 ===== */
@@ -488,8 +492,6 @@ function drawBullets(){
       ctx.beginPath();
       ctx.arc(b.x, b.y, 6, 0, Math.PI*2);
       ctx.fill();
-
-      // 가장 아래쪽 적 추적
       if(!b.target || !enemies.includes(b.target)){
         if(enemies.length>0){
           let bottomEnemy = enemies.reduce((a,c)=> (a.y>c.y? a:c));
@@ -605,7 +607,7 @@ function gameLoop(){
 }
 setInterval(gameLoop,30);
 
-/* ===== 조작 ===== */
+/* ===== 조작 (무기 발사) ===== */
 window.addEventListener("keydown", e=>{
   if(!gameRunning) return;
   if(e.key==="ArrowLeft"){
@@ -629,6 +631,23 @@ window.addEventListener("keydown", e=>{
   }
 });
 
+/* ===== 입력(한글로 맞추기) ===== */
+document.getElementById("answerBox").addEventListener("keydown", e=>{
+  if(e.key==="Enter" && gameRunning){
+    let input = e.target.value.trim();
+    enemies.forEach((enemy, i)=>{
+      if(enemy.sound===input){
+        enemies.splice(i,1);
+        score += 30; // 입력으로 맞추면 점수 더 줌
+        checkUnlock();
+        checkLevelUp();
+        updateStatus();
+      }
+    });
+    e.target.value="";
+  }
+});
+
 /* ===== 시작 버튼 ===== */
 document.getElementById("startBtn").addEventListener("click", ()=>{
   if(!gameRunning){
@@ -638,6 +657,7 @@ document.getElementById("startBtn").addEventListener("click", ()=>{
     enemySpeed=0.7; spawnInterval=3500;
     updateStatus();
     restartSpawn();
+    document.getElementById("answerBox").focus(); // ✅ 입력창도 즉시 사용 가능
   }
 });
 </script>
