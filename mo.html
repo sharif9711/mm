@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<title>주소로 마커 및 필지 외곽선 표시</title>
+<title>주소(도로명+지번)으로 마커 및 필지 외곽선 표시</title>
 
 <!-- OpenLayers -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@v7.5.2/ol.css">
@@ -20,8 +20,8 @@ button{ padding:6px 10px; cursor:pointer; }
 </head>
 
 <body>
-<h2>📍 주소 입력으로 마커 + 필지 외곽선 표시</h2>
-<p>예시: 서울특별시 종로구 사직로 161</p>
+<h2>📍 도로명주소 + 지번주소 입력으로 마커 및 필지 외곽선 표시</h2>
+<p>예시1: 서울특별시 종로구 사직로 161<br>예시2: 서울특별시 종로구 신교동 1-1</p>
 <input type="text" id="addressInput" placeholder="주소를 입력하세요">
 <button id="searchBtn">검색</button>
 
@@ -30,6 +30,7 @@ button{ padding:6px 10px; cursor:pointer; }
 <script>
 const API_KEY = "BE552462-0744-32DB-81E7-1B7317390D68";
 
+// 기본 지도
 const baseLayer = new ol.layer.Tile({
   source: new ol.source.XYZ({
     url: `https://api.vworld.kr/req/wmts/1.0.0/${API_KEY}/Base/{z}/{y}/{x}.png`
@@ -47,13 +48,11 @@ const map = new ol.Map({
   view: view
 });
 
-// 마커와 폴리곤 레이어 생성
 let markerLayer = new ol.layer.Vector({ source: new ol.source.Vector() });
 let polygonLayer = new ol.layer.Vector({ source: new ol.source.Vector() });
 map.addLayer(markerLayer);
 map.addLayer(polygonLayer);
 
-// 마커 스타일
 const markerStyle = new ol.style.Style({
   image: new ol.style.Icon({
     src: 'http://map.vworld.kr/images/ol3/marker_blue.png',
@@ -61,13 +60,20 @@ const markerStyle = new ol.style.Style({
   })
 });
 
-// 폴리곤 스타일
 const polygonStyle = new ol.style.Style({
   stroke: new ol.style.Stroke({ color: 'rgba(0,128,255,0.9)', width: 3 }),
   fill: new ol.style.Fill({ color: 'rgba(0,128,255,0.2)' })
 });
 
+// 주소 유형 감지: 지번주소는 대부분 숫자+“-”가 있음
+function detectAddressType(address) {
+  const regex = /\d+-?\d*/;
+  return regex.test(address) ? "parcel" : "road";
+}
+
 function searchAddress(address) {
+  const addrType = detectAddressType(address);
+
   $.ajax({
     url: "https://api.vworld.kr/req/address",
     dataType: "jsonp",
@@ -76,20 +82,20 @@ function searchAddress(address) {
       request: "getcoord",
       version: "2.0",
       format: "json",
-      type: "road",   // 도로명 기반
+      type: addrType,
       key: API_KEY,
       address: address
     },
     success: function(data) {
       if (!data.response || data.response.status === "NOT_FOUND") {
-        alert("주소를 찾을 수 없습니다.");
+        // 첫 시도 실패 시, 다른 타입으로 재시도
+        if (addrType === "road") retryAddress(address, "parcel");
+        else retryAddress(address, "road");
         return;
       }
-
       const result = data.response.result.point;
       const x = parseFloat(result.x);
       const y = parseFloat(result.y);
-      console.log("좌표:", x, y);
       showMarkerAndPolygon(x, y);
     },
     error: function() {
@@ -98,30 +104,52 @@ function searchAddress(address) {
   });
 }
 
+function retryAddress(address, retryType) {
+  $.ajax({
+    url: "https://api.vworld.kr/req/address",
+    dataType: "jsonp",
+    data: {
+      service: "address",
+      request: "getcoord",
+      version: "2.0",
+      format: "json",
+      type: retryType,
+      key: API_KEY,
+      address: address
+    },
+    success: function(data) {
+      if (!data.response || data.response.status === "NOT_FOUND") {
+        alert("주소를 찾을 수 없습니다.");
+        return;
+      }
+      const result = data.response.result.point;
+      const x = parseFloat(result.x);
+      const y = parseFloat(result.y);
+      showMarkerAndPolygon(x, y);
+    }
+  });
+}
+
 function showMarkerAndPolygon(x, y) {
-  // 마커 표시
   markerLayer.getSource().clear();
+  polygonLayer.getSource().clear();
+
   const marker = new ol.Feature({
     geometry: new ol.geom.Point(ol.proj.fromLonLat([x, y]))
   });
   marker.setStyle(markerStyle);
   markerLayer.getSource().addFeature(marker);
 
-  // 지도 이동
   map.getView().animate({ center: ol.proj.fromLonLat([x, y]), zoom: 18 });
 
-  // 필지 외곽선 조회
   getParcelPolygon(x, y);
 }
 
 function getParcelPolygon(lon, lat) {
-  polygonLayer.getSource().clear();
-
-  // EPSG:4326 → EPSG:900913 변환
   const point3857 = ol.proj.transform([lon, lat], "EPSG:4326", "EPSG:900913");
   const geomfilter = `POINT(${point3857[0]} ${point3857[1]})`;
 
-  const dataParams = {
+  const params = {
     key: API_KEY,
     service: "data",
     version: "2.0",
@@ -138,20 +166,19 @@ function getParcelPolygon(lon, lat) {
 
   $.ajax({
     url: "https://api.vworld.kr/req/data",
-    data: dataParams,
+    data: params,
     dataType: "jsonp",
     success: function(data) {
       if (!data.response || !data.response.result || !data.response.result.featureCollection) {
         alert("필지 데이터를 불러올 수 없습니다.");
         return;
       }
-
-      const geojson = new ol.format.GeoJSON().readFeatures(data.response.result.featureCollection);
-      geojson.forEach(f => f.setStyle(polygonStyle));
-      polygonLayer.getSource().addFeatures(geojson);
+      const features = new ol.format.GeoJSON().readFeatures(data.response.result.featureCollection);
+      features.forEach(f => f.setStyle(polygonStyle));
+      polygonLayer.getSource().addFeatures(features);
     },
     error: function() {
-      alert("필지 조회 중 오류가 발생했습니다.");
+      alert("필지 외곽선 표시 중 오류가 발생했습니다.");
     }
   });
 }
